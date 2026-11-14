@@ -1,28 +1,27 @@
-# Nivel 2 · Cálculo de costos por porción
+# Cálculo de costos de ingredientes por porción — Nivel 2
 
-## Entradas
+## Descripción
+Script en Python (`calcular_costos.py`) que determina el costo de ingredientes por porción de los 50 platos de la carta al **31/10/2026**. Usa aritmética exacta (`decimal.Decimal` / `fractions.Fraction`) sin redondeos intermedios y redondeo final a dos decimales con `ROUND_HALF_UP`.
 
-- `catalogo.csv`: equivalencias de cada presentación de cada producto a unidad base (g, ml o unidad).
-- `rendimientos.csv`: coeficientes limpio/bruto y cocido/limpio por producto.
-- `recetas.json`: recetario completo (50 platos P01–P50 y 15 preparaciones S01–S15).
-- `facturas/F-001.pdf` … `F-040.pdf`: 40 facturas de compra.
-- `notas/NC-001.pdf` … `NC-004.pdf`: documentos asociados (bonificaciones o devoluciones) que ajustan renglones de facturas anteriores.
+## Entradas utilizadas
+- `nivel-2/catalogo.csv`: equivalencias entre presentaciones de compra y unidades base (g, ml, unidad).
+- `nivel-2/rendimientos.csv`: coeficientes de merma/rendimiento (`limpio_sobre_bruto` y `cocido_sobre_limpio`).
+- `nivel-2/facturas/F-001.pdf` … `F-040.pdf`: comprobantes de compra con cantidades, presentaciones, precios unitarios, bonificaciones por volumen e importes netos.
+- `nivel-2/notas/NC-001.pdf` … `NC-004.pdf`: notas de crédito asociadas a factura y renglón de origen (bonificación descuenta importe neto; devolución descuenta importe neto y unidades equivalentes).
+- `nivel-2/recetas.json`: composición de los 50 platos (P01–P50) y las 15 preparaciones base (S01–S15).
 
-## Lógica del cálculo
+## Lógica de cálculo
+1. **Extracción y ajuste documental:** se extrae el texto de cada PDF (respetando el orden dinámico de columnas), se convierten las cantidades a unidades base mediante `catalogo.csv` y se aplican las notas de crédito emitidas hasta el 2026-10-31 sobre su factura y renglón de origen.
+2. **Precio unitario efectivo vigente:** para cada producto se selecciona el comprobante con fecha ≤ 2026-10-31 más reciente (desempatando por identificador de factura alfanuméricamente mayor) y se calcula  
+   PU_efectivo = Neto ajustado / Cantidad equivalente ajustada.
+3. **Explosión de recetas y mermas:** cada ingrediente en estado `limpio` se divide por `limpio_sobre_bruto`, cada ingrediente en estado `cocido` se divide por `limpio_sobre_bruto × cocido_sobre_limpio`, y cada ingrediente `preparado` se prorratea recursivamente según el rendimiento declarado de su tanda.
 
-1. Se extrae el texto de cada factura y nota con `pdftotext`.
-2. Se parsean las líneas de factura identificando producto, presentación, cantidad, precio unitario, bonificación y neto (el orden de columnas varía entre facturas; se valida que `neto ≈ cantidad × precio × (1 − bonif/100)`).
-3. Se aplican las notas de crédito con fecha ≤ 31/10/2026:
-   - Se resta el importe acreditado del neto del renglón.
-   - Si es devolución, se resta también la cantidad devuelta.
-4. Para cada producto se toma la última factura con fecha ≤ 31/10/2026 (en empate de fecha, el identificador alfanumérico mayor).
-5. Precio efectivo = neto ajustado / cantidad equivalente en unidad base (según catálogo).
-6. Para cada plato se calcula el costo de ingredientes:
-   - Se convierte la cantidad de la receta (según estado bruto/limpio/cocido) a cantidad bruta usando los rendimientos.
-   - Se multiplica por el precio efectivo por unidad base.
-   - Las preparaciones (Sxx) se costean por su rendimiento completo y se prorratean.
-7. Se redondea el resultado final a 2 decimales (half-up). No hay redondeos intermedios.
+## Ejecución
+Requiere Python 3.10+ y `pypdf` (o texto pre-extraído con `pdftotext`):
 
-## Salida
+```bash
+pip install pypdf
+python nivel-2/codigo/calcular_costos.py
+```
 
-`../costos.csv` con encabezado `plato,costo_por_porcion` y una fila por cada plato P01–P50.
+El script escribe `nivel-2/costos.csv` con el encabezado `plato,costo_por_porcion` y una fila por cada plato P01–P50.
